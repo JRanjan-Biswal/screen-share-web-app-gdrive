@@ -9,6 +9,8 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@ffmpeg/ffmpeg": "^0.12.15",
+    "@ffmpeg/util": "^0.12.2",
     "@google-cloud/storage": "^7.17.1",
     "@types/fluent-ffmpeg": "^2.1.27",
     "@types/google.visualization": "^0.0.74",

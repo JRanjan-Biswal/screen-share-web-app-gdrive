@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useEffect, use } from 'react';
+import { useState, useEffect, use, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import VideoEditor from '@/components/VideoEditor';
+import EnhancedVideoEditor from '@/components/EnhancedVideoEditor';
 import GoogleAuth from '@/components/GoogleAuth';
 import { Video } from '@/types/video';
 
@@ -20,28 +20,7 @@ export default function EditPage({ params }: EditPageProps) {
   const [loading, setLoading] = useState(true);
   const [authLoading, setAuthLoading] = useState(true);
 
-  useEffect(() => {
-    checkAuthentication();
-  }, []);
-
-  const checkAuthentication = async () => {
-    try {
-      setAuthLoading(true);
-      const response = await fetch('/api/auth/status');
-      const data = await response.json();
-      setIsAuthenticated(data.authenticated);
-      
-      if (data.authenticated) {
-        await loadVideo();
-      }
-    } catch (error) {
-      console.error('Failed to check authentication:', error);
-    } finally {
-      setAuthLoading(false);
-    }
-  };
-
-  const loadVideo = async () => {
+  const loadVideo = useCallback(async () => {
     try {
       setLoading(true);
       const response = await fetch(`/api/videos/${id}`);
@@ -61,7 +40,29 @@ export default function EditPage({ params }: EditPageProps) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [id, router]);
+
+  const checkAuthentication = useCallback(async () => {
+    try {
+      setAuthLoading(true);
+      const response = await fetch('/api/auth/status');
+      const data = await response.json();
+      setIsAuthenticated(data.authenticated);
+      
+      if (data.authenticated) {
+        await loadVideo();
+      }
+    } catch (error) {
+      console.error('Failed to check authentication:', error);
+    } finally {
+      setAuthLoading(false);
+    }
+  }, [loadVideo]);
+
+  useEffect(() => {
+    checkAuthentication();
+  }, [checkAuthentication]);
+
 
   const handleEditComplete = () => {
     // Redirect back to home page after editing is complete
@@ -129,7 +130,7 @@ export default function EditPage({ params }: EditPageProps) {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
       <div className="container mx-auto px-4 py-8">
-        <VideoEditor
+        <EnhancedVideoEditor
           video={video}
           onComplete={handleEditComplete}
           onCancel={handleCancel}

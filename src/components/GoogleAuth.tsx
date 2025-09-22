@@ -3,7 +3,7 @@
 import { useState } from 'react';
 
 interface GoogleAuthProps {
-  onAuthenticated: () => void;
+  onAuthenticated?: () => void;
 }
 
 export default function GoogleAuth({ onAuthenticated }: GoogleAuthProps) {
@@ -22,6 +22,10 @@ export default function GoogleAuth({ onAuthenticated }: GoogleAuthProps) {
       const data = await response.json();
       
       if (data.success && data.authUrl) {
+        // Call the callback if provided
+        if (onAuthenticated) {
+          onAuthenticated();
+        }
         // Redirect to Google OAuth
         window.location.href = data.authUrl;
       } else {

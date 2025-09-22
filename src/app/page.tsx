@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import VideoList from '@/components/VideoList';
 import GoogleAuth from '@/components/GoogleAuth';
 import { Video } from '@/types/video';
@@ -10,27 +10,7 @@ export default function Home() {
   const [videos, setVideos] = useState<Video[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    checkAuthentication();
-  }, []);
-
-  const checkAuthentication = async () => {
-    try {
-      const response = await fetch('/api/auth/status');
-      const data = await response.json();
-      setIsAuthenticated(data.authenticated);
-      
-      if (data.authenticated) {
-        await loadVideos();
-      }
-    } catch (error) {
-      console.error('Failed to check authentication:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const loadVideos = async () => {
+  const loadVideos = useCallback(async () => {
     try {
       setLoading(true);
       const response = await fetch('/api/videos');
@@ -46,7 +26,28 @@ export default function Home() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  const checkAuthentication = useCallback(async () => {
+    try {
+      const response = await fetch('/api/auth/status');
+      const data = await response.json();
+      setIsAuthenticated(data.authenticated);
+      
+      if (data.authenticated) {
+        await loadVideos();
+      }
+    } catch (error) {
+      console.error('Failed to check authentication:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, [loadVideos]);
+
+  useEffect(() => {
+    checkAuthentication();
+  }, [checkAuthentication]);
+
 
   const handleVideoDelete = async (videoId: string) => {
     try {

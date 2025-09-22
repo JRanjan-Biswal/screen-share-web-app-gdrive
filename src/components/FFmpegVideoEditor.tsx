@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { Video, VideoEditOptions } from '@/types/video';
 
 interface FFmpegVideoEditorProps {
@@ -22,7 +22,7 @@ export default function FFmpegVideoEditor({ video, onComplete, onCancel }: FFmpe
   const videoRef = useRef<HTMLVideoElement>(null);
   const [loading, setLoading] = useState(false);
   const [videoUrl, setVideoUrl] = useState<string>('');
-  const [videoInfo, setVideoInfo] = useState<VideoInfo | null>(null);
+  const [videoInfo] = useState<VideoInfo | null>(null);
   const [editOptions, setEditOptions] = useState<VideoEditOptions>({
     startTime: 0,
     endTime: 100,
@@ -37,44 +37,32 @@ export default function FFmpegVideoEditor({ video, onComplete, onCancel }: FFmpe
   const [processing, setProcessing] = useState(false);
   const [progress, setProgress] = useState(0);
 
-  useEffect(() => {
-    loadVideo();
-    return () => {
-      if (videoUrl) {
-        URL.revokeObjectURL(videoUrl);
-      }
-    };
-  }, [video.id]);
-
-  const loadVideo = async () => {
+  const loadVideo = useCallback(async () => {
     try {
       setLoading(true);
-      console.log('Loading video:', video.id);
-      
-      // Download video for preview
       const response = await fetch(`/api/videos/${video.id}/download`);
       const blob = await response.blob();
       const url = URL.createObjectURL(blob);
       setVideoUrl(url);
-
-      // Get video info using FFmpeg
-      const infoResponse = await fetch(`/api/videos/${video.id}/process`);
-      const infoData = await infoResponse.json();
-      
-      if (infoData.success) {
-        setVideoInfo(infoData.videoInfo);
-        setDuration(infoData.videoInfo.duration);
-        setEditOptions(prev => ({
-          ...prev,
-          endTime: 100
-        }));
-      }
     } catch (error) {
       console.error('Failed to load video:', error);
     } finally {
       setLoading(false);
     }
-  };
+  }, [video.id]);
+
+  useEffect(() => {
+    loadVideo();
+  }, [video.id, loadVideo]);
+
+  useEffect(() => {
+    return () => {
+      if (videoUrl) {
+        URL.revokeObjectURL(videoUrl);
+      }
+    };
+  }, [videoUrl]);
+
 
   const handleVideoLoaded = () => {
     if (videoRef.current && !videoInfo) {

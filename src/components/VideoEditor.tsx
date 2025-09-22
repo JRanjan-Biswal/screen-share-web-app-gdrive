@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { Video, VideoEditOptions } from '@/types/video';
 
 interface VideoEditorProps {
@@ -11,7 +11,6 @@ interface VideoEditorProps {
 
 export default function VideoEditor({ video, onComplete, onCancel }: VideoEditorProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
   const [loading, setLoading] = useState(false);
   const [videoUrl, setVideoUrl] = useState<string>('');
   const [editOptions, setEditOptions] = useState<VideoEditOptions>({
@@ -26,20 +25,7 @@ export default function VideoEditor({ video, onComplete, onCancel }: VideoEditor
   const [isPlaying, setIsPlaying] = useState(false);
   const [duration, setDuration] = useState(0);
 
-  useEffect(() => {
-    loadVideo();
-    // Set duration from video prop if available
-    if (video.durationInMs) {
-      setDuration(video.durationInMs / 1000); // Convert milliseconds to seconds
-    }
-    return () => {
-      if (videoUrl) {
-        URL.revokeObjectURL(videoUrl);
-      }
-    };
-  }, [video.id, video.durationInMs]);
-
-  const loadVideo = async () => {
+  const loadVideo = useCallback(async () => {
     try {
       setLoading(true);
       const response = await fetch(`/api/videos/${video.id}/download`);
@@ -51,7 +37,24 @@ export default function VideoEditor({ video, onComplete, onCancel }: VideoEditor
     } finally {
       setLoading(false);
     }
-  };
+  }, [video.id]);
+
+  useEffect(() => {
+    loadVideo();
+    // Set duration from video prop if available
+    if (video.durationInMs) {
+      setDuration(video.durationInMs / 1000); // Convert milliseconds to seconds
+    }
+  }, [video.id, video.durationInMs, loadVideo]);
+
+  useEffect(() => {
+    return () => {
+      if (videoUrl) {
+        URL.revokeObjectURL(videoUrl);
+      }
+    };
+  }, [videoUrl]);
+
 
   const handleVideoLoaded = async() => {
     if (videoRef.current) {
@@ -78,11 +81,6 @@ export default function VideoEditor({ video, onComplete, onCancel }: VideoEditor
     }
   };
 
-  const handleSeek = (time: number) => {
-    if (videoRef.current) {
-      videoRef.current.currentTime = time;
-    }
-  };
 
   const handleOptionChange = (option: keyof VideoEditOptions, value: number | string) => {
     setEditOptions(prev => ({
