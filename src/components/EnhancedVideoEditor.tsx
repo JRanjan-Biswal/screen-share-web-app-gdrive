@@ -245,6 +245,7 @@ export default function EnhancedVideoEditor({ video, onCancel }: EnhancedVideoEd
       setProcessing(prev => ({ ...prev, stage: 'Loading video...', progress: 10 }));
       const inputFileName = video.name.endsWith('.webm') ? 'input.webm' : 'input.mp4';
       await ffmpeg.writeFile(inputFileName, await fetchFile(videoBlob));
+      setProcessing(prev => ({ ...prev, stage: 'Video loaded, starting processing...', progress: 15 }));
 
       // Build FFmpeg command
       const args = [
@@ -284,13 +285,32 @@ export default function EnhancedVideoEditor({ video, onCancel }: EnhancedVideoEd
       console.log('FFmpeg command:', args);
 
       // Set up progress tracking
-      ffmpeg.on('progress', ({ progress }) => {
+      let progressInterval: NodeJS.Timeout;
+      let currentProgress = 20;
+      
+      ffmpeg.on('progress', ({ progress, time }) => {
+        console.log('FFmpeg progress:', { progress, time });
+        const progressPercent = Math.round(progress * 100);
+        currentProgress = Math.max(currentProgress, progressPercent);
         setProcessing(prev => ({
           ...prev,
-          progress: Math.round(progress * 100),
-          stage: 'Processing video...'
+          progress: Math.round(currentProgress),
+          stage: `Processing video... ${Math.round(currentProgress)}%`
         }));
       });
+
+      // Fallback progress mechanism
+      progressInterval = setInterval(() => {
+        if (currentProgress < 85) {
+          currentProgress += Math.random() * 5; // Increment by 0-5%
+          const roundedProgress = Math.min(Math.round(currentProgress), 85);
+          setProcessing(prev => ({
+            ...prev,
+            progress: roundedProgress,
+            stage: `Processing video... ${roundedProgress}%`
+          }));
+        }
+      }, 1000);
 
       setProcessing(prev => ({ ...prev, stage: 'Processing video...', progress: 20 }));
 
@@ -298,6 +318,11 @@ export default function EnhancedVideoEditor({ video, onCancel }: EnhancedVideoEd
       console.log('Executing FFmpeg command...');
       await ffmpeg.exec(args);
       console.log('FFmpeg command completed');
+      
+      // Clear the fallback progress interval
+      if (progressInterval) {
+        clearInterval(progressInterval);
+      }
 
       // Read output file
       setProcessing(prev => ({ ...prev, stage: 'Finalizing...', progress: 90 }));
@@ -313,6 +338,16 @@ export default function EnhancedVideoEditor({ video, onCancel }: EnhancedVideoEd
       await ffmpeg.deleteFile('output.mp4');
 
       setProcessing(prev => ({ ...prev, stage: 'Complete!', progress: 100 }));
+      
+      // Small delay to show completion
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      // Reset processing state
+      setProcessing({
+        isProcessing: false,
+        progress: 0,
+        stage: ''
+      });
 
     } catch (error) {
       console.error('Video processing failed:', error);
