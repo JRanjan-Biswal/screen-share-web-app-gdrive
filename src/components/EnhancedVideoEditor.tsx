@@ -34,6 +34,7 @@ export default function EnhancedVideoEditor({ video, onCancel }: EnhancedVideoEd
     stage: ''
   });
   const [outputUrl, setOutputUrl] = useState<string>('');
+  const [processedQuality, setProcessedQuality] = useState<string>('');
   
   const [editOptions, setEditOptions] = useState<VideoEditOptions>({
     startTime: 0,
@@ -257,27 +258,13 @@ export default function EnhancedVideoEditor({ video, onCancel }: EnhancedVideoEd
         '-avoid_negative_ts', 'make_zero'
       ];
 
-      // Add audio effects if needed
-      if (editOptions.volume !== 100) {
-        args.push('-af', `volume=${editOptions.volume / 100}`);
-      }
-
-      if (editOptions.speed !== 1) {
-        args.push('-filter:v', `setpts=${1 / editOptions.speed}*PTS`);
-      }
-
-      // Add fade effects
-      if (editOptions.fadeIn > 0 || editOptions.fadeOut > 0) {
-        const fadeFilter = [];
-        if (editOptions.fadeIn > 0) {
-          fadeFilter.push(`fade=t=in:st=0:d=${editOptions.fadeIn}`);
-        }
-        if (editOptions.fadeOut > 0) {
-          fadeFilter.push(`fade=t=out:st=${trimDuration - editOptions.fadeOut}:d=${editOptions.fadeOut}`);
-        }
-        if (fadeFilter.length > 0) {
-          args.push('-vf', fadeFilter.join(','));
-        }
+      // Add quality settings based on selection
+      if (editOptions.quality === 'low') {
+        args.push('-crf', '28', '-preset', 'fast');
+      } else if (editOptions.quality === 'medium') {
+        args.push('-crf', '23', '-preset', 'medium');
+      } else if (editOptions.quality === 'high') {
+        args.push('-crf', '18', '-preset', 'slow');
       }
 
       args.push('output.mp4');
@@ -332,6 +319,7 @@ export default function EnhancedVideoEditor({ video, onCancel }: EnhancedVideoEd
       const url = URL.createObjectURL(blob);
       console.log('Output video created, URL:', url);
       setOutputUrl(url);
+      setProcessedQuality(editOptions.quality);
 
       // Clean up FFmpeg files
       await ffmpeg.deleteFile(inputFileName);
@@ -406,12 +394,23 @@ export default function EnhancedVideoEditor({ video, onCancel }: EnhancedVideoEd
                 Cancel
               </button>
               {outputUrl && (
-                <button
-                  onClick={downloadTrimmedVideo}
-                  className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition duration-200"
-                >
-                  Download
-                </button>
+                <div className="flex gap-2">
+                  <button
+                    onClick={downloadTrimmedVideo}
+                    className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition duration-200 flex items-center gap-2"
+                  >
+                    <span>📥</span>
+                    Download ({editOptions.quality === 'low' ? '480p' : editOptions.quality === 'medium' ? '720p' : '1080p'})
+                  </button>
+                  <button
+                    onClick={trimVideo}
+                    disabled={processing.isProcessing || !ffmpegRef.current}
+                    className="bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-400 text-white px-4 py-2 rounded-lg transition duration-200 flex items-center gap-2"
+                  >
+                    <span>🔄</span>
+                    Re-process Video
+                  </button>
+                </div>
               )}
             </div>
           </div>
@@ -524,109 +523,71 @@ export default function EnhancedVideoEditor({ video, onCancel }: EnhancedVideoEd
 
           {/* Controls Panel */}
           <div className="space-y-6">
-            {/* Audio Controls */}
-            <div>
-              <h3 className="font-medium text-gray-900 mb-4">Audio Controls</h3>
+            {/* Video Quality Control */}
+            <div className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm">
+              <h3 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                <span className="text-lg">🎥</span>
+                Video Quality
+              </h3>
               <div className="space-y-4">
-                <div>
-                  <label className="block text-sm text-gray-600 mb-2">
-                    Volume: {editOptions.volume}%
-                  </label>
-                  <input
-                    type="range"
-                    min="0"
-                    max="200"
-                    value={editOptions.volume}
-                    onChange={(e) => setEditOptions(prev => ({
-                      ...prev,
-                      volume: parseInt(e.target.value)
-                    }))}
-                    className="w-full"
-                    disabled={processing.isProcessing}
-                  />
+                <div className="grid grid-cols-1 gap-3">
+                  {[
+                    { value: 'low', label: 'Low Quality', resolution: '480p', description: 'Smaller file size, faster processing', color: 'bg-blue-50 border-blue-200 text-blue-700' },
+                    { value: 'medium', label: 'Medium Quality', resolution: '720p', description: 'Balanced quality and file size', color: 'bg-green-50 border-green-200 text-green-700' },
+                    { value: 'high', label: 'High Quality', resolution: '1080p', description: 'Best quality, larger file size', color: 'bg-purple-50 border-purple-200 text-purple-700' }
+                  ].map((option) => (
+                    <label
+                      key={option.value}
+                      className={`relative flex items-center p-4 rounded-lg border-2 cursor-pointer transition-all duration-200 ${
+                        editOptions.quality === option.value
+                          ? `${option.color} ring-2 ring-offset-2 ring-indigo-500`
+                          : 'bg-gray-50 border-gray-200 hover:bg-gray-100'
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="quality"
+                        value={option.value}
+                        checked={editOptions.quality === option.value}
+                        onChange={(e) => setEditOptions(prev => ({
+                          ...prev,
+                          quality: e.target.value as 'low' | 'medium' | 'high'
+                        }))}
+                        className="sr-only"
+                        disabled={processing.isProcessing}
+                      />
+                      <div className="flex-1">
+                        <div className="flex items-center justify-between">
+                          <span className="font-medium text-gray-900">{option.label}</span>
+                          <span className="text-sm font-mono bg-gray-100 px-2 py-1 rounded">{option.resolution}</span>
+                        </div>
+                        <p className="text-sm text-gray-600 mt-1">{option.description}</p>
+                      </div>
+                      <div className={`ml-3 w-4 h-4 rounded-full border-2 ${
+                        editOptions.quality === option.value
+                          ? 'border-indigo-500 bg-indigo-500'
+                          : 'border-gray-300'
+                      }`}>
+                        {editOptions.quality === option.value && (
+                          <div className="w-2 h-2 bg-white rounded-full m-0.5"></div>
+                        )}
+                      </div>
+                    </label>
+                  ))}
                 </div>
-
-                <div>
-                  <label className="block text-sm text-gray-600 mb-2">
-                    Fade In: {editOptions.fadeIn}s
-                  </label>
-                  <input
-                    type="range"
-                    min="0"
-                    max="10"
-                    step="0.5"
-                    value={editOptions.fadeIn}
-                    onChange={(e) => setEditOptions(prev => ({
-                      ...prev,
-                      fadeIn: parseFloat(e.target.value)
-                    }))}
-                    className="w-full"
-                    disabled={processing.isProcessing}
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm text-gray-600 mb-2">
-                    Fade Out: {editOptions.fadeOut}s
-                  </label>
-                  <input
-                    type="range"
-                    min="0"
-                    max="10"
-                    step="0.5"
-                    value={editOptions.fadeOut}
-                    onChange={(e) => setEditOptions(prev => ({
-                      ...prev,
-                      fadeOut: parseFloat(e.target.value)
-                    }))}
-                    className="w-full"
-                    disabled={processing.isProcessing}
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Video Controls */}
-            <div>
-              <h3 className="font-medium text-gray-900 mb-4">Video Controls</h3>
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm text-gray-600 mb-2">
-                    Speed: {editOptions.speed}x
-                  </label>
-                  <input
-                    type="range"
-                    min="0.5"
-                    max="2"
-                    step="0.1"
-                    value={editOptions.speed}
-                    onChange={(e) => setEditOptions(prev => ({
-                      ...prev,
-                      speed: parseFloat(e.target.value)
-                    }))}
-                    className="w-full"
-                    disabled={processing.isProcessing}
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm text-gray-600 mb-2">
-                    Quality
-                  </label>
-                  <select
-                    value={editOptions.quality}
-                    onChange={(e) => setEditOptions(prev => ({
-                      ...prev,
-                      quality: e.target.value as 'low' | 'medium' | 'high'
-                    }))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                    disabled={processing.isProcessing}
-                  >
-                    <option value="low">Low (480p)</option>
-                    <option value="medium">Medium (720p)</option>
-                    <option value="high">High (1080p)</option>
-                  </select>
-                </div>
+                
+                {outputUrl && processedQuality && editOptions.quality !== processedQuality && (
+                  <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                    <div className="flex items-start gap-2">
+                      <span className="text-amber-600 text-sm">ℹ️</span>
+                      <div className="text-sm text-amber-700">
+                        <p className="font-medium">Quality Change Detected</p>
+                        <p>Current: {processedQuality === 'low' ? '480p' : processedQuality === 'medium' ? '720p' : '1080p'} → New: {editOptions.quality === 'low' ? '480p' : editOptions.quality === 'medium' ? '720p' : '1080p'}</p>
+                        <p className="mt-1">Click "Re-process Video" to apply the new quality settings.</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -645,7 +606,7 @@ export default function EnhancedVideoEditor({ video, onCancel }: EnhancedVideoEd
                 disabled={processing.isProcessing}
                 className="w-full bg-gray-600 hover:bg-gray-700 disabled:bg-gray-400 text-white px-4 py-2 rounded-lg transition duration-200"
               >
-                Reset All
+                Reset Trim
               </button>
             </div>
           </div>
