@@ -28,12 +28,16 @@ export default function VideoEditor({ video, onComplete, onCancel }: VideoEditor
 
   useEffect(() => {
     loadVideo();
+    // Set duration from video prop if available
+    if (video.durationInMs) {
+      setDuration(video.durationInMs / 1000); // Convert milliseconds to seconds
+    }
     return () => {
       if (videoUrl) {
         URL.revokeObjectURL(videoUrl);
       }
     };
-  }, [video.id]);
+  }, [video.id, video.durationInMs]);
 
   const loadVideo = async () => {
     try {
@@ -51,14 +55,15 @@ export default function VideoEditor({ video, onComplete, onCancel }: VideoEditor
 
   const handleVideoLoaded = async() => {
     if (videoRef.current) {
-      // await videoRef.current.play();
-      const duration = videoRef.current.duration;
-      console.log('Duration:', duration);
-      // setDuration(duration);
-      // setEditOptions(prev => ({
-      //   ...prev,
-      //   endTime: 100
-      // }));
+      // Use duration from video prop if available, otherwise get from video element
+      const videoDuration = video.durationInMs ? video.durationInMs / 1000 : videoRef.current.duration;
+      if (videoDuration && videoDuration !== duration) {
+        setDuration(videoDuration);
+        setEditOptions(prev => ({
+          ...prev,
+          endTime: 100
+        }));
+      }
     }
   };
 

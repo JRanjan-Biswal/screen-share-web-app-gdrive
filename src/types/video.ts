@@ -6,6 +6,7 @@ export interface Video {
   webViewLink: string;
   thumbnailLink?: string;
   duration?: number;
+  durationInMs?: number;
   mimeType?: string;
 }
 
