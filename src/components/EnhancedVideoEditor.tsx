@@ -117,7 +117,20 @@ export default function EnhancedVideoEditor({ video, onCancel }: EnhancedVideoEd
 
   const handleTimeUpdate = () => {
     if (videoRef.current) {
-      setCurrentTime(videoRef.current.currentTime);
+      const currentVideoTime = videoRef.current.currentTime;
+      const startTime = (editOptions.startTime / 100) * duration;
+      const endTime = (editOptions.endTime / 100) * duration;
+      
+      // Constrain current time to stay exactly within trim range
+      const constrainedTime = Math.max(startTime, Math.min(currentVideoTime, endTime));
+      
+      // If video has gone beyond the end time, pause it
+      if (currentVideoTime >= endTime) {
+        videoRef.current.pause();
+        setIsPlaying(false);
+      }
+      
+      setCurrentTime(constrainedTime);
     }
   };
 
@@ -134,24 +147,44 @@ export default function EnhancedVideoEditor({ video, onCancel }: EnhancedVideoEd
 
   const handleSeek = (time: number) => {
     if (videoRef.current) {
-      videoRef.current.currentTime = time;
+      // Constrain the seek time to be within the trim range
+      const startTime = (editOptions.startTime / 100) * duration;
+      const endTime = (editOptions.endTime / 100) * duration;
+      const constrainedTime = Math.max(startTime, Math.min(time, endTime));
+      
+      videoRef.current.currentTime = constrainedTime;
+      setCurrentTime(constrainedTime); // Update the state to move the red line
     }
   };
 
   const handleStartTimeChange = (time: number) => {
     const percentage = (time / duration) * 100;
+    const constrainedPercentage = Math.max(0, Math.min(percentage, editOptions.endTime - 1));
+    
     setEditOptions(prev => ({
       ...prev,
-      startTime: Math.max(0, Math.min(percentage, prev.endTime - 1))
+      startTime: constrainedPercentage
     }));
+    
+    // If current time is before the new start time, move it to the start
+    if (videoRef.current && videoRef.current.currentTime < time) {
+      videoRef.current.currentTime = time;
+    }
   };
 
   const handleEndTimeChange = (time: number) => {
     const percentage = (time / duration) * 100;
+    const constrainedPercentage = Math.max(editOptions.startTime + 1, Math.min(percentage, 100));
+    
     setEditOptions(prev => ({
       ...prev,
-      endTime: Math.max(prev.startTime + 1, Math.min(percentage, 100))
+      endTime: constrainedPercentage
     }));
+    
+    // If current time is after the new end time, move it to the end
+    if (videoRef.current && videoRef.current.currentTime > time) {
+      videoRef.current.currentTime = time;
+    }
   };
 
   const handlePreview = () => {
@@ -160,11 +193,14 @@ export default function EnhancedVideoEditor({ video, onCancel }: EnhancedVideoEd
       const endTime = (editOptions.endTime / 100) * duration;
 
       videoRef.current.currentTime = startTime;
+      setCurrentTime(startTime); // Update the state to position the red line
       videoRef.current.play();
+      setIsPlaying(true); // Update the playing state
 
       const stopAtEnd = () => {
         if (videoRef.current && videoRef.current.currentTime >= endTime) {
           videoRef.current.pause();
+          setIsPlaying(false); // Update the playing state
           videoRef.current.removeEventListener('timeupdate', stopAtEnd);
         }
       };
@@ -289,6 +325,12 @@ export default function EnhancedVideoEditor({ video, onCancel }: EnhancedVideoEd
     }
   };
 
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
   const downloadTrimmedVideo = () => {
     if (outputUrl) {
       const a = document.createElement('a');
@@ -359,7 +401,12 @@ export default function EnhancedVideoEditor({ video, onCancel }: EnhancedVideoEd
 
             {/* Timeline */}
             <div className="space-y-4">
-              <h3 className="font-medium text-gray-900">Timeline</h3>
+              <div className="flex items-center justify-between">
+                <h3 className="font-semibold text-gray-900 text-lg">Timeline</h3>
+                <div className="text-sm text-gray-500">
+                  Total Duration: <span className="font-mono font-medium">{formatTime(duration)}</span>
+                </div>
+              </div>
               <Timeline
                 duration={duration}
                 startTime={(editOptions.startTime / 100) * duration}
@@ -373,40 +420,46 @@ export default function EnhancedVideoEditor({ video, onCancel }: EnhancedVideoEd
             </div>
 
             {/* Preview Controls */}
-            <div className="flex gap-4">
+            <div className="flex flex-wrap gap-3">
               <button
                 onClick={handlePlayPause}
                 disabled={processing.isProcessing}
-                className="bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white px-6 py-2 rounded-lg transition duration-200"
+                className="flex items-center gap-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white px-4 py-2 rounded-lg transition duration-200 font-medium"
               >
+                <span className="text-lg">{isPlaying ? '⏸️' : '▶️'}</span>
                 {isPlaying ? 'Pause' : 'Play'}
               </button>
               <button
                 onClick={handlePreview}
                 disabled={processing.isProcessing}
-                className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white px-6 py-2 rounded-lg transition duration-200"
+                className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white px-4 py-2 rounded-lg transition duration-200 font-medium"
               >
+                <span className="text-lg">👁️</span>
                 Preview Selection
               </button>
               <button
                 onClick={trimVideo}
                 disabled={processing.isProcessing || !ffmpegRef.current}
-                className="bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-400 text-white px-6 py-2 rounded-lg transition duration-200"
+                className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-400 text-white px-4 py-2 rounded-lg transition duration-200 font-medium"
               >
+                <span className="text-lg">✂️</span>
                 {processing.isProcessing ? 'Processing...' : 'Trim Video'}
               </button>
             </div>
 
             {/* Processing Progress */}
             {processing.isProcessing && (
-              <div className="space-y-2">
-                <div className="flex justify-between text-sm text-gray-600">
-                  <span>{processing.stage}</span>
-                  <span>{processing.progress}%</span>
+              <div className="space-y-3 p-4 bg-gray-50 rounded-lg border">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-indigo-600"></div>
+                    <span className="text-sm font-medium text-gray-700">{processing.stage}</span>
+                  </div>
+                  <span className="text-sm font-mono font-medium text-indigo-600">{processing.progress}%</span>
                 </div>
-                <div className="w-full bg-gray-200 rounded-full h-2">
+                <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
                   <div
-                    className="bg-indigo-600 h-2 rounded-full transition-all duration-300"
+                    className="bg-gradient-to-r from-indigo-500 to-indigo-600 h-3 rounded-full transition-all duration-300 ease-out"
                     style={{ width: `${processing.progress}%` }}
                   />
                 </div>
@@ -415,14 +468,20 @@ export default function EnhancedVideoEditor({ video, onCancel }: EnhancedVideoEd
 
             {/* Output Video */}
             {outputUrl && (
-              <div className="space-y-4">
-                <h3 className="font-medium text-gray-900">Trimmed Video</h3>
-                <div className="aspect-video bg-black rounded-lg overflow-hidden">
+              <div className="space-y-4 p-4 bg-green-50 rounded-lg border border-green-200">
+                <div className="flex items-center gap-2">
+                  <span className="text-lg">✅</span>
+                  <h3 className="font-semibold text-gray-900">Trimmed Video Ready!</h3>
+                </div>
+                <div className="aspect-video bg-black rounded-lg overflow-hidden shadow-lg">
                   <video
                     src={outputUrl}
                     controls
                     className="w-full h-full"
                   />
+                </div>
+                <div className="text-sm text-gray-600 text-center">
+                  Your trimmed video is ready for download
                 </div>
               </div>
             )}
