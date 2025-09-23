@@ -55,10 +55,10 @@ export async function POST(
     const shareResults = [];
     for (const email of emails) {
       try {
-        // Check if already shared with this email
-        const alreadyShared = existingPermissions.some(
-          (perm: any) => perm.emailAddress === email
-        );
+    // Check if already shared with this email
+    const alreadyShared = existingPermissions.some(
+      (perm: { emailAddress?: string }) => perm.emailAddress === email
+    );
 
         if (alreadyShared) {
           shareResults.push({
@@ -100,7 +100,7 @@ export async function POST(
             message: errorData.error?.message || 'Failed to share'
           });
         }
-      } catch (error) {
+      } catch {
         shareResults.push({
           email,
           success: false,

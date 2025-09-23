@@ -280,7 +280,6 @@ export default function EnhancedVideoEditor({ video, onCancel }: EnhancedVideoEd
       console.log('FFmpeg command:', args);
 
       // Set up progress tracking
-      let progressInterval: NodeJS.Timeout;
       let currentProgress = 20;
       
       ffmpeg.on('progress', ({ progress, time }) => {
@@ -295,7 +294,7 @@ export default function EnhancedVideoEditor({ video, onCancel }: EnhancedVideoEd
       });
 
       // Fallback progress mechanism
-      progressInterval = setInterval(() => {
+      const progressInterval: NodeJS.Timeout = setInterval(() => {
         if (currentProgress < 85) {
           currentProgress += Math.random() * 5; // Increment by 0-5%
           const roundedProgress = Math.min(Math.round(currentProgress), 85);
@@ -677,7 +676,7 @@ export default function EnhancedVideoEditor({ video, onCancel }: EnhancedVideoEd
                       <div className="text-sm text-amber-700">
                         <p className="font-medium">Quality Change Detected</p>
                         <p>Current: {processedQuality === 'low' ? '480p' : processedQuality === 'medium' ? '720p' : '1080p'} → New: {editOptions.quality === 'low' ? '480p' : editOptions.quality === 'medium' ? '720p' : '1080p'}</p>
-                        <p className="mt-1">Click "Re-process Video" to apply the new quality settings.</p>
+                        <p className="mt-1">Click &quot;Re-process Video&quot; to apply the new quality settings.</p>
                       </div>
                     </div>
                   </div>

@@ -25,7 +25,6 @@ export default function Timeline({
 }: TimelineProps) {
   const timelineRef = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState<'start' | 'end' | 'current' | null>(null);
-  const [dragOffset, setDragOffset] = useState(0);
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -48,9 +47,6 @@ export default function Timeline({
     e.preventDefault();
     e.stopPropagation();
     setIsDragging(handle);
-    
-    // Set drag offset to 0 - we'll calculate the new position directly from mouse position
-    setDragOffset(0);
   };
 
   const handleDocumentMouseMove = useCallback((e: MouseEvent) => {
@@ -90,7 +86,6 @@ export default function Timeline({
 
   const handleMouseUp = () => {
     setIsDragging(null);
-    setDragOffset(0);
   };
 
   const handleTimelineClick = (e: React.MouseEvent) => {
@@ -110,12 +105,11 @@ export default function Timeline({
   };
 
   useEffect(() => {
-    const handleGlobalMouseUp = () => {
-      if (isDragging) {
-        setIsDragging(null);
-        setDragOffset(0);
-      }
-    };
+            const handleGlobalMouseUp = () => {
+              if (isDragging) {
+                setIsDragging(null);
+              }
+            };
 
     if (isDragging) {
       document.addEventListener('mousemove', handleDocumentMouseMove);
